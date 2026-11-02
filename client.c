@@ -2,11 +2,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "segdef.h"
-
+#include <sys/wait.h>
 #define NB_SEMS 3
 #define SHMAT_ERROR ((void *)-1)
-On/* Nombre de requêtes envoyées au serveur */
+/* Nombre de requêtes envoyées au serveur */
 #define NB_REQUESTS 10
+/* Nombre de clients lancés en parallèle avec fork() */
+#define NB_CLIENTS 5
 
 struct sembuf sop;
 
@@ -79,8 +81,8 @@ static int send_request(int semid, segment *seg, int req,
 
     return same_request;
 }
-
-int main(void)
+/* Travail d'un client*/
+static int run_client(void)
 {
     int semid;
     segment *seg;
@@ -109,5 +111,35 @@ int main(void)
         perror("shmdt");
         return EXIT_FAILURE;
     }
-    return EXIT_SUCCESS;
+    return (nb_ok == NB_REQUESTS) ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+int main(void)
+{
+    /* Création des clients : chaque enfant exécute run_client */
+    int nb_created = 0;
+    for (int i = 0; i < NB_CLIENTS; i++) {
+        pid_t pid = fork();
+        if (pid == -1) {
+            perror("fork");
+            break;                
+        }
+        if (pid == 0)
+            exit(run_client());    
+        nb_created++;              
+    }
+
+    /* Le parent attend tous ses enfants*/
+    int nb_clients_ok = 0;
+    for (int i = 0; i < nb_created; i++) {
+        int status;
+        if (wait(&status) == -1) {
+            perror("wait");
+            return EXIT_FAILURE;
+        }
+        if (WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS)
+            nb_clients_ok++;
+    }
+
+    
+    return (nb_clients_ok == NB_CLIENTS) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
