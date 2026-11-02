@@ -5,8 +5,10 @@
 
 #define NB_SEMS 3
 #define SHMAT_ERROR ((void *)-1)
-/* Nombre de requêtes envoyées au serveur */
+On/* Nombre de requêtes envoyées au serveur */
 #define NB_REQUESTS 10
+
+struct sembuf sop;
 
 /* Récupère les identifiants du segment et des sémaphores créés par le serveur,
    attache le segment et initialise le générateur.
