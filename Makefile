@@ -6,12 +6,15 @@ CFLAGS += -Wall -Wextra -g
 
 LDLIBS += libseg.a
 
-all: $(BIN) client_perso
+all: $(BIN)
 
-$(BIN): segdef.h
+# Chaque programme est compilé depuis son .c, avec la bibliothèque fournie
+$(BIN): %: %.c segdef.h
+	$(CC) $(CFLAGS) $< -o $@ $(LDLIBS)
 
-client_perso: client.c segdef.h
-	$(CC) $(CFLAGS) client.c -o $@
+# Partie 3 : client avec nos propres routines de sémaphores (mysem.c)
+client_perso: client.c mysem.c segdef.h
+	$(CC) $(CFLAGS) client.c mysem.c -o $@
 
 clean:
 	rm -f $(BIN) client_perso
