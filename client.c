@@ -46,6 +46,24 @@ static long fill_segment(segment *seg, int req)
     return sum / maxval;
 }
 
+/* Envoie une requête au serveur en suivant le protocole des sémaphores. 
+Renvoie le résultat calculé par le serveur, et met la moyenne locale dans *local_result. */ 
+static long send_request(int semid, segment *seg, int req, long *local_result) 
+{ 
+    acq_sem(semid, seg_dispo); /* Attend que le segment soit libre */ 
+    *local_result = fill_segment(seg, req); 
+    acq_sem(semid, seg_init); /* Attend que le segment soit initialisé */ 
+    wait_sem(semid, res_ok); /* Attend que le résultat soit prêt */ 
+    long server_result = seg->result; /* Lit le résultat */ 
+    lib_sem(semid, seg_init); /* Dit au serveur que le segment est lu */ 
+    acq_sem(semid, res_ok); /* Attend que le serveur libère res_ok */ 
+    lib_sem(semid, res_ok); /* Remet res_OK a sa valeur initiale */
+    lib_sem(semid, seg_dispo); /* Rend le segment aux autres clients */ 
+    return server_result; 
+}
+
+
+
 int main(void)
 {
     int semid;
@@ -59,14 +77,16 @@ int main(void)
 
     /* Test de fill_segment sur une variable locale */
     segment test;
-    long local_result = fill_segment(&test, 1);
-    printf("pid = %d, req = %d, tab[0] = %ld, tab[1] = %ld, moyenne = %ld\n",
-           test.pid, test.req, test.tab[0], test.tab[1], local_result);
+    long local_result; 
+    long server_result = send_request(semid, seg, 1, &local_result); 
+    printf("client = %ld, serveur = %ld -> %s\n", local_result, server_result, local_result == server_result ? "OK" : "DIFFERENT");
+
 
     // Détacher le segment
     if (shmdt(seg) == -1) {
         perror("shmdt");
         return EXIT_FAILURE;
     }
+
     return EXIT_SUCCESS;
 }
